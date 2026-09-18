@@ -11,11 +11,20 @@ app.use(express.json());
 app.use("/customer",session({secret:"fingerprint_customer",resave: true, saveUninitialized: true}))
 
 app.use("/customer/auth/*", function auth(req,res,next){
-    if(req.session.authorization) {
-        token = req.session.authorization['accessToken'];
+    const authorization = req.headers.authorization;
+    const sessionToken = req.session.authorization && req.session.authorization.accessToken;
+    const bearerToken = authorization && authorization.startsWith('Bearer ')
+        ? authorization.slice(7)
+        : null;
+    const token = sessionToken || bearerToken;
+
+    if(token) {
         jwt.verify(token, "access",(err,user)=>{
             if(!err){
                 req.user = user;
+                if (!req.session.authorization) {
+                    req.session.authorization = {accessToken: token, username: user.username};
+                }
                 next();
             } else{
                 return res.status(403).json({message: "User not authenticated"})
